@@ -1,7 +1,6 @@
 package servlet;
 
-import java.io.OutputStream;
-
+import io.netty.channel.ChannelHandlerContext;
 import server.httptools.JerryRequest;
 
 public interface Servlet
@@ -9,6 +8,6 @@ public interface Servlet
     public void init()
         throws Exception;
     
-    public void service(JerryRequest request, OutputStream out)
+    public void service(JerryRequest request, ChannelHandlerContext ctx)
         throws Exception;
 }

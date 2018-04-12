@@ -1,30 +1,20 @@
 package server.httptools;
 
-import java.io.InputStream;
-import java.util.HashSet;
-import java.util.Set;
+import io.netty.buffer.ByteBuf;
 
 public class JerryRequest
 {
     private String request = null;
     
-    private static final Set<Long> THREADS = new HashSet<>();
-    
-    public JerryRequest(InputStream socketIn)
+    public JerryRequest(Object msg)
         throws Exception
     {
-        Long threadId = Thread.currentThread().getId();
-        if (THREADS.contains(threadId))
-        {
-            throw new RuntimeException("该方法只能被一个线程调用一次.");
-        }
-        THREADS.add(threadId);
-        int size = socketIn.available();
-        byte[] buffer = new byte[size];
-        socketIn.read(buffer);
-        String req = new String(buffer);
+        ByteBuf buf = (ByteBuf) msg;
+        byte[] bytes = new byte[buf.readableBytes()];
+        buf.readBytes(bytes);
+        String req = new String(bytes, "UTF-8");
         this.request = req;
-        System.out.println("Thread ID : [" + threadId + "]'s JerryRequest has been inited.");
+        System.out.println("Thread ID : [" + Thread.currentThread().getId() + "]'s JerryRequest has been inited.");
     }
     
     public String getRequestString()

@@ -1,14 +1,13 @@
 package server;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
-
-import server.httptools.JerryRequest;
-import servlet.Servlet;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
  * This is my first Server
@@ -17,61 +16,12 @@ import servlet.Servlet;
  */
 public class HttpServer
 {
-    private static Map<String, Servlet> servletCache = new HashMap<>();
-    
     public static void main(String[] args)
     {
-        int port;
-        
+        int port = 8080;
         try
         {
-            port = Integer.parseInt(args[0]);
-        }
-        catch (Exception e)
-        {
-            port = 8080;
-        }
-        
-        try (ServerSocket serverSocket = new ServerSocket(port))
-        {
-            System.out.println("服务器正在监听端口：" + serverSocket.getLocalPort());
-            System.out.println();
-            for (;;)
-            {
-                try
-                {
-                    final Socket socket = serverSocket.accept();
-                    new Thread(new Runnable()
-                    {
-                        @Override
-                        public void run()
-                        {
-                            System.out.println("<===============================================>");
-                            System.out
-                                .println("接受到一条TCP连接： " + socket.getInetAddress() + ":" + socket.getPort());
-                            try
-                            {
-                                try
-                                {
-                                    service(socket);
-                                }
-                                finally
-                                {
-                                    socket.close();
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                e.printStackTrace();
-                            }
-                        }
-                    }).start();
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
+            new HttpServer().bind(port);
         }
         catch (Exception e)
         {
@@ -79,76 +29,45 @@ public class HttpServer
         }
     }
     
-    private static void service(Socket socket)
+    public void bind(int port)
         throws Exception
     {
-        InputStream socketIn = socket.getInputStream();
-        OutputStream socketOut = socket.getOutputStream();
-        
-        JerryRequest request = new JerryRequest(socketIn);
-        
-        System.out.println(request.getRequestString());// 打印HTTP请求信息
-        
-        String uri = request.getRequestUri(); // URI
-        
-        String contentType = null;
-        
-        if (uri.indexOf("html") != -1 || uri.indexOf("htm") != -1)
+        // 配置服务器端的NIO线程组
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        try
         {
-            contentType = "text/html";
+            ServerBootstrap b = new ServerBootstrap();
+            b.group(bossGroup, workerGroup)
+                .channel(NioServerSocketChannel.class)
+                .option(ChannelOption.SO_BACKLOG, 1024)
+                .childHandler(new ChildChannelHandler());
+            // 绑定端口，同步等待成功
+            ChannelFuture f = b.bind(port).sync();
+            System.out.println("服务器正在监听端口：" + f.channel().localAddress().toString());
+            
+            // 等待服务端监听端口关闭
+            f.channel().closeFuture().sync();
         }
-        else if (uri.indexOf("jpg") != -1 || uri.indexOf("jpeg") != -1)
+        finally
         {
-            contentType = "image/jpeg";
+            // 优雅退出，释放线程池资源
+            bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
         }
-        else if (uri.indexOf("gif") != -1)
-        {
-            contentType = "image/gif";
-        }
-        // 如果请求访问Servlet,则动态调用Servlet对象的service()方法
-        else if (uri.indexOf("servlet") != -1)
-        {
-            // 获得Servlet的名字
-            String servletName = null;
-            if (uri.indexOf("?") != -1)
-            {
-                servletName = uri.substring(uri.indexOf("servlet/") + 8, uri.indexOf("?"));
-            }
-            else
-            {
-                servletName = uri.substring(uri.indexOf("servlet/") + 8, uri.length());
-            }
-            // 尝试从servletCache中获取Servlet对象
-            Servlet servlet = (Servlet)servletCache.get(servletName);
-            if (servlet == null)
-            {
-                servlet = (Servlet)Class.forName("servlet." + servletName).newInstance();
-                servlet.init();
-                servletCache.put(servletName, servlet);
-            }
-            servlet.service(request, socketOut);
-        }
-        else
-        {
-            contentType = "application/octet-stream"; // 字节流类型
-        }
+    }
+    
+    private class ChildChannelHandler extends ChannelInitializer<SocketChannel>
+    {
         
-        // 非Servlet请求的响应方式
-        if (contentType != null && contentType.length() > 0)
+        @Override
+        protected void initChannel(SocketChannel channel)
+            throws Exception
         {
-            String responseFirstLine = "HTTP/1.1 200 OK\r\n";
-            String responseHeader = "Content-Type:" + contentType + "\r\n\r\n";
-            InputStream in = HttpServer.class.getResourceAsStream("/resource" + uri);
-            socketOut.write(responseFirstLine.getBytes());
-            socketOut.write(responseHeader.getBytes());
-            int len = 0;
-            byte[] buffer = new byte[128];
-            while ((len = in.read(buffer)) != -1)
-            {
-                socketOut.write(buffer, 0, len);
-            }
+            System.out.println("<===============================================>");
+            System.out.println("接受到一条TCP连接： " + channel.remoteAddress().toString());
+            channel.pipeline().addLast(new HttpServerHandler());
         }
         
     }
-    
 }
