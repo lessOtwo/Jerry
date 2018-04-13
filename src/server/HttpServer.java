@@ -6,6 +6,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import server.httptools.JerryRequest;
 import servlet.Servlet;
@@ -36,12 +38,14 @@ public class HttpServer
         {
             System.out.println("服务器正在监听端口：" + serverSocket.getLocalPort());
             System.out.println();
+            ExecutorService executor = Executors.newFixedThreadPool(8);
             for (;;)
             {
                 try
                 {
                     final Socket socket = serverSocket.accept();
-                    new Thread(new Runnable()
+                    /* 可以使用线程池来达到复用优化 */
+                    executor.execute(new Runnable()
                     {
                         @Override
                         public void run()
@@ -65,7 +69,7 @@ public class HttpServer
                                 e.printStackTrace();
                             }
                         }
-                    }).start();
+                    });
                 }
                 catch (Exception e)
                 {
