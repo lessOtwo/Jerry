@@ -23,6 +23,7 @@ public class HelloServlet implements Servlet
         out.write("Content-Type:text/html\r\n\r\n".getBytes());
         out.write("<html><head><title>HelloWorld</title></head><body>".getBytes());
         out.write(new String("<h1>Hello:" + username + "</h1></body></html>").getBytes());
+        out.close();
     }
     
 }

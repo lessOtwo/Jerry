@@ -32,6 +32,7 @@ public class UploadServlet implements Servlet
             out.write(("FileName: " + resultMap.get("fileName") + "<br>").getBytes()); 
             out.write(("FileSize: " + resultMap.get("fileLen") + "<br>").getBytes()); 
         }
+        out.close();
         
     }
     

@@ -41,40 +41,35 @@ public class HttpServer
             ExecutorService executor = Executors.newFixedThreadPool(8);
             for (;;)
             {
-                try
+                final Socket socket = serverSocket.accept();
+                /* 可以使用线程池来达到复用优化 */
+                executor.execute(new Runnable()
                 {
-                    final Socket socket = serverSocket.accept();
-                    /* 可以使用线程池来达到复用优化 */
-                    executor.execute(new Runnable()
+                    @Override
+                    public void run()
                     {
-                        @Override
-                        public void run()
+                        System.out.println("<===============================================>");
+                        System.out.println("接受到一条TCP连接： " + socket.getInetAddress() + ":" + socket.getPort());
+                        try
                         {
-                            System.out.println("<===============================================>");
-                            System.out
-                                .println("接受到一条TCP连接： " + socket.getInetAddress() + ":" + socket.getPort());
                             try
                             {
-                                try
-                                {
-                                    service(socket);
-                                }
-                                finally
+                                service(socket);
+                            }
+                            finally
+                            {
+                                if (socket.isConnected())
                                 {
                                     socket.close();
                                 }
                             }
-                            catch (Exception e)
-                            {
-                                e.printStackTrace();
-                            }
                         }
-                    });
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
+                        catch (Exception e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                });
             }
         }
         catch (Exception e)
